@@ -10,7 +10,7 @@ from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfigura
 
 # Настройка интерфейса
 st.set_page_config(page_title="Raccoon AI", layout="wide")
-st.title("🦝 Raccoon AI System")
+st.title("Huec")
 
 # 1. ЗАГРУЗКА МОДЕЛЕЙ
 MODELS = {
@@ -103,3 +103,4 @@ webrtc_streamer(
     rtc_configuration=RTC_CONFIG,
     media_stream_constraints={"video": True, "audio": False}
 )
+

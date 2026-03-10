@@ -9,7 +9,7 @@ import av
 from streamlit_webrtc import webrtc_streamer, RTCConfiguration, VideoProcessorBase
 
 st.set_page_config(page_title="Raccoon AI", layout="wide")
-st.title("🦝 Raccoon AI System")
+st.title("Huec")
 
 # 1. ЗАГРУЗКА МОДЕЛЕЙ
 MODELS = {
@@ -106,3 +106,4 @@ webrtc_streamer(
     },
     async_processing=True,
 )
+

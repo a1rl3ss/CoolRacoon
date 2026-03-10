@@ -6,10 +6,10 @@ import urllib.request
 import time
 import streamlit as st
 import av
-from streamlit_webrtc import webrtc_streamer, RTCConfiguration
+from streamlit_webrtc import webrtc_streamer, RTCConfiguration, VideoProcessorBase
 
 st.set_page_config(page_title="Raccoon AI", layout="wide")
-st.title("Hui")
+st.title("🦝 Raccoon AI System")
 
 # 1. ЗАГРУЗКА МОДЕЛЕЙ
 MODELS = {
@@ -31,10 +31,9 @@ def get_raccoon(name, h):
     cv2.putText(blank, name, (10, h//2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
     return blank
 
-# 2. КЛАСС-ПРОЦЕССОР (Для стабильной работы внутри WebRTC)
-class RaccoonProcessor:
+# 2. ПРОЦЕССОР
+class RaccoonProcessor(VideoProcessorBase):
     def __init__(self):
-        # Создаем детекторы прямо здесь, а не снаружи
         BaseOptions = mp.tasks.BaseOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
         
@@ -63,18 +62,14 @@ class RaccoonProcessor:
 
         if pose_res.pose_landmarks:
             p = pose_res.pose_landmarks[0]
-            l_wrist, r_wrist = p[15], p[16]
-            nose, l_ear, r_ear = p[0], p[7], p[8]
-            l_sh, r_sh = p[11], p[12]
-
-            if abs(nose.x - l_ear.x) < abs(nose.x - r_ear.x) * 0.4:
-                emotion = "pls.png"
-            elif l_wrist.y < nose.y - 0.1 and r_wrist.y < nose.y - 0.1:
-                emotion = "beg.png" if abs(l_wrist.x - r_wrist.x) < 0.15 else "cinema.png"
-            elif (l_wrist.z < l_sh.z - 0.6) or (r_wrist.z < r_sh.z - 0.6):
+            l_wrist, r_wrist = p[15], p[16], p[0]
+            nose = p[0]
+            
+            # Логика упрощена для скорости облака
+            if l_wrist.y < nose.y - 0.1 and r_wrist.y < nose.y - 0.1:
+                emotion = "beg.png"
+            elif l_wrist.z < p[11].z - 0.5:
                 emotion = "gun.png"
-            elif l_wrist.y < nose.y and abs(l_wrist.x - nose.x) < 0.2:
-                emotion = "hard.png"
 
         if emotion == "normal.png" and face_res.face_landmarks:
             f = face_res.face_landmarks[0]
@@ -83,25 +78,31 @@ class RaccoonProcessor:
                 emotion = "cool.png"
             elif m_open >= 0.045:
                 emotion = "shock.png"
-            elif f[61].y > f[13].y + 0.008 and f[291].y > f[13].y + 0.008:
-                emotion = "sad.png"
 
         raccoon = get_raccoon(emotion, h)
         combined = np.hstack((img, raccoon))
         return av.VideoFrame.from_ndarray(combined, format="bgr24")
 
-# 3. ЗАПУСК
+# 3. УЛУЧШЕННАЯ КОНФИГУРАЦИЯ ICE (STUN/TURN)
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [
         {"urls": ["stun:stun.l.google.com:19302"]},
-        {"urls": ["turn:openrelay.metered.ca:80"], "username": "openrelayproject", "credential": "openrelayproject"}
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+        {
+            "urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
+            "username": "openrelayproject",
+            "credential": "openrelayproject"
+        }
     ]}
 )
 
 webrtc_streamer(
-    key="raccoon-filter",
-    video_processor_factory=RaccoonProcessor, # Вернулись к фабрике, но с новым классом
+    key="raccoon-final",
+    video_processor_factory=RaccoonProcessor,
     rtc_configuration=RTC_CONFIGURATION,
-    media_stream_constraints={"video": True, "audio": False},
+    media_stream_constraints={
+        "video": {"width": {"ideal": 480}, "height": {"ideal": 360}}, # Снизили разрешение для iPad
+        "audio": False
+    },
     async_processing=True,
 )

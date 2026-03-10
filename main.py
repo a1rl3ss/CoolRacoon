@@ -7,6 +7,8 @@ import time
 import streamlit as st
 import av
 from streamlit_webrtc import webrtc_streamer, RTCConfiguration
+import os
+st.write("Файлы в проекте:", os.listdir())
 
 # 1. Настройка страницы Streamlit
 st.set_page_config(page_title="Raccoon AI System", layout="wide")
@@ -135,4 +137,5 @@ webrtc_streamer(
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
+
 

@@ -9,10 +9,10 @@ import av
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # 1. Настройка страницы
-st.set_page_config(page_title="Raccoon AI iPad", layout="wide")
+st.set_page_config(page_title="Raccoon AI", layout="wide")
 st.title("🦝 Raccoon AI System")
 
-# 2. ЗАГРУЗКА МОДЕЛЕЙ
+# 2. ЗАГРУЗКА МОДЕЛЕЙ (с проверкой)
 MODELS = {
     "face": ("face_landmarker.task", "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"),
     "pose": ("pose_landmarker_full.task", "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task")
@@ -20,6 +20,7 @@ MODELS = {
 
 for name, (path, url) in MODELS.items():
     if not os.path.exists(path):
+        st.info(f"Загрузка модели {name}...")
         urllib.request.urlretrieve(url, path)
 
 def get_raccoon(name, h):
@@ -27,7 +28,8 @@ def get_raccoon(name, h):
     if os.path.exists(full_path):
         img = cv2.imread(full_path)
         if img is not None: return cv2.resize(img, (h, h))
-    return np.zeros((h, h, 3), dtype=np.uint8)
+    # Если картинки нет, возвращаем серый квадрат, чтобы не упало
+    return np.zeros((h, h, 3), dtype=np.uint8) + 128
 
 # Настройки MediaPipe
 BaseOptions = mp.tasks.BaseOptions
@@ -51,33 +53,33 @@ class RaccoonProcessor(VideoProcessorBase):
         img = cv2.flip(img, 1)
         h, w, _ = img.shape
         
+        # Подготовка изображения для MediaPipe
         mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         ts = int(time.time() * 1000)
 
+        # Детекция
         face_res = self.face_det.detect_for_video(mp_img, ts)
         pose_res = self.pose_det.detect_for_video(mp_img, ts)
 
         emotion = "normal.png"
 
+        # Логика жестов (Поза)
         if pose_res.pose_landmarks:
             p = pose_res.pose_landmarks[0]
             l_wrist, r_wrist = p[15], p[16]
             nose, l_ear, r_ear = p[0], p[7], p[8]
             l_sh, r_sh = p[11], p[12]
 
-            # ПОВОРОТ ГОЛОВЫ ВЛЕВО
             if abs(nose.x - l_ear.x) < abs(nose.x - r_ear.x) * 0.4:
                 emotion = "pls.png"
-            # РУКИ ВВЕРХ
             elif l_wrist.y < nose.y - 0.1 and r_wrist.y < nose.y - 0.1:
                 emotion = "beg.png" if abs(l_wrist.x - r_wrist.x) < 0.15 else "cinema.png"
-            # ПИСТОЛЕТ (простая версия для облака)
             elif (l_wrist.z < l_sh.z - 0.6) or (r_wrist.z < r_sh.z - 0.6):
                 emotion = "gun.png"
-            # HARD
             elif l_wrist.y < nose.y and abs(l_wrist.x - nose.x) < 0.2:
                 emotion = "hard.png"
 
+        # Логика лица (если нет жестов)
         if emotion == "normal.png" and face_res.face_landmarks:
             f = face_res.face_landmarks[0]
             m_open = abs(f[13].y - f[14].y)
@@ -86,19 +88,20 @@ class RaccoonProcessor(VideoProcessorBase):
             elif m_open >= 0.045:
                 emotion = "shock.png"
 
-        raccoon = get_raccoon(emotion, h)
-        combined = np.hstack((img, raccoon))
+        # Склеиваем результат
+        raccoon_img = get_raccoon(emotion, h)
+        combined = np.hstack((img, raccoon_img))
         
         return av.VideoFrame.from_ndarray(combined, format="bgr24")
 
-# 4. КОНФИГУРАЦИЯ И ЗАПУСК
+# 4. ЗАПУСК СЕРВЕРА СВЯЗИ
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
 webrtc_streamer(
     key="raccoon-filter",
-    video_processor_factory=RaccoonProcessor, # Этого достаточно
+    video_processor_factory=RaccoonProcessor,
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,

@@ -10,7 +10,7 @@ from streamlit_webrtc import webrtc_streamer, RTCConfiguration
 
 # 1. Настройка страницы Streamlit
 st.set_page_config(page_title="Raccoon AI System", layout="wide")
-st.title("🦝 Raccoon AI System")
+st.title("GUGUGAGA")
 st.write("Нажми **START** и разреши доступ к камере. Если видео не грузится, попробуй выключить VPN.")
 
 # 2. ЗАГРУЗКА МОДЕЛЕЙ MEDIAPIPE
@@ -135,3 +135,4 @@ webrtc_streamer(
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
+

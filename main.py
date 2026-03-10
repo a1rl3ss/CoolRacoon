@@ -10,7 +10,7 @@ from streamlit_webrtc import webrtc_streamer, RTCConfiguration, VideoProcessorBa
 
 # 1. Настройка страницы
 st.set_page_config(page_title="Raccoon AI Lite", layout="wide")
-st.title("🦝 Raccoon AI System")
+st.title("Huec")
 
 # Загрузка моделей (если их нет)
 MODELS = {
@@ -90,3 +90,4 @@ webrtc_streamer(
     media_stream_constraints={"video": {"width": 320, "height": 240}, "audio": False},
     async_processing=True,
 )
+

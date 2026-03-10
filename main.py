@@ -5,6 +5,7 @@ import os
 import urllib.request
 import time
 import streamlit as st
+import av
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # 1. Настройка страницы
@@ -21,7 +22,6 @@ for name, (path, url) in MODELS.items():
     if not os.path.exists(path):
         urllib.request.urlretrieve(url, path)
 
-# Функция загрузки картинок
 def get_raccoon(name, h):
     full_path = os.path.join(os.getcwd(), name)
     if os.path.exists(full_path):
@@ -40,7 +40,7 @@ pose_opts = mp.tasks.vision.PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=MODELS["pose"][0]), 
     running_mode=VisionRunningMode.VIDEO)
 
-# 3. НОВЫЙ КЛАСС ПРОЦЕССОРА
+# 3. КЛАСС ПРОЦЕССОРА
 class RaccoonProcessor(VideoProcessorBase):
     def __init__(self):
         self.face_det = mp.tasks.vision.FaceLandmarker.create_from_options(face_opts)
@@ -65,12 +65,16 @@ class RaccoonProcessor(VideoProcessorBase):
             nose, l_ear, r_ear = p[0], p[7], p[8]
             l_sh, r_sh = p[11], p[12]
 
+            # ПОВОРОТ ГОЛОВЫ ВЛЕВО
             if abs(nose.x - l_ear.x) < abs(nose.x - r_ear.x) * 0.4:
                 emotion = "pls.png"
+            # РУКИ ВВЕРХ
             elif l_wrist.y < nose.y - 0.1 and r_wrist.y < nose.y - 0.1:
                 emotion = "beg.png" if abs(l_wrist.x - r_wrist.x) < 0.15 else "cinema.png"
+            # ПИСТОЛЕТ (простая версия для облака)
             elif (l_wrist.z < l_sh.z - 0.6) or (r_wrist.z < r_sh.z - 0.6):
                 emotion = "gun.png"
+            # HARD
             elif l_wrist.y < nose.y and abs(l_wrist.x - nose.x) < 0.2:
                 emotion = "hard.png"
 
@@ -85,18 +89,16 @@ class RaccoonProcessor(VideoProcessorBase):
         raccoon = get_raccoon(emotion, h)
         combined = np.hstack((img, raccoon))
         
-        import av # Нужен для возврата кадра
         return av.VideoFrame.from_ndarray(combined, format="bgr24")
 
-# 4. ЗАПУСК
+# 4. КОНФИГУРАЦИЯ И ЗАПУСК
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
 webrtc_streamer(
     key="raccoon-filter",
-    mode=webrtc_streamer.VideoProcessorBase,
-    video_processor_factory=RaccoonProcessor,
+    video_processor_factory=RaccoonProcessor, # Этого достаточно
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
